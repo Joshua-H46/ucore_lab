@@ -188,12 +188,28 @@ trap_dispatch(struct trapframe *tf) {
         cprintf("### Switch to user mode");
         if (tf->tf_cs != USER_CS)
         {
-            k2u = *tf;
+        /* It seems there are two ways to do the k2u switch
+         * The first is to use another trapframe as a temp relay. So we set the esp which was pushed into stack before calling trap to point to the temp trapframe, and then get from the trapframe the next esp which points to the origin stack position above tf
+         * In this implementation, we don't have to modify the esp before the int system call
+         */
+/*            k2u = *tf;
             k2u.tf_cs = USER_CS;
             k2u.tf_ds = k2u.tf_es = k2u.tf_ss = USER_DS;
             k2u.tf_eflags |= FL_IOPL_MASK;
             k2u.tf_esp = (uint32_t)tf + sizeof(struct trapframe) - 8;
             *((uint32_t*)tf - 1) = &k2u;
+*/
+
+            /* The second is to update the trapframe in the stack directly and does not need additional trapframe
+             * Since no previlege changes occur in the interrupt, the current trapframe doesn't have the last 8 bytes. 
+             * We have to sub the esp by 8 before issuing the int system call
+             * Then we can modify the trapframe as needed and set the esp to the stack position above the trapframe, which will be retrieved due to the K2U switch
+             */
+            
+            tf->tf_cs = USER_CS;
+            tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
+            tf->tf_eflags |= FL_IOPL_MASK;
+            tf->tf_esp = (uint32_t)tf + sizeof(struct trapframe);
         }
         break;
     case T_SWITCH_TOK:
