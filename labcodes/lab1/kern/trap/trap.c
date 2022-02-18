@@ -156,6 +156,53 @@ print_regs(struct pushregs *regs) {
 /* trap_dispatch - dispatch based on what type of trap occurred */
 static volatile size_t tick = 0;
 static struct trapframe k2u;
+
+static void switchToUserMode(struct trapframe *tf)
+{
+    if (tf->tf_cs != USER_CS)
+    {
+    /* It seems there are two ways to do the k2u switch
+     * The first is to use another trapframe as a temp relay. So we set the esp which was pushed into stack before calling trap to point to the temp trapframe, and then get from the trapframe the next esp which points to the origin stack position above tf
+     * In this implementation, we don't have to modify the esp before the int system call
+     */
+/*        k2u = *tf;
+        k2u.tf_cs = USER_CS;
+        k2u.tf_ds = k2u.tf_es = k2u.tf_ss = USER_DS;
+        k2u.tf_eflags |= FL_IOPL_MASK;
+        k2u.tf_esp = (uint32_t)tf + sizeof(struct trapframe) - 8;
+        *((uint32_t*)tf - 1) = &k2u;
+*/
+
+        /* The second is to update the trapframe in the stack directly and does not need additional trapframe
+         * Since no previlege changes occur in the interrupt, the current trapframe doesn't have the last 8 bytes. 
+         * We have to sub the esp by 8 before issuing the int system call
+         * Then we can modify the trapframe as needed and set the esp to the stack position above the trapframe, which will be retrieved due to the K2U switch
+         */
+
+        // seems to have some problems           
+        // try again and seems ok 
+        tf->tf_cs = USER_CS;
+        tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
+        tf->tf_eflags |= FL_IOPL_MASK;
+        tf->tf_esp = (uint32_t)tf + sizeof(struct trapframe);
+
+    }
+}
+
+static void switchToKernelMode(struct trapframe *tf)
+{
+    if (tf->tf_cs != KERNEL_CS)
+    {
+        struct trapframe* u2k;
+        tf->tf_cs = KERNEL_CS;
+        tf->tf_ds = tf->tf_es = KERNEL_DS;
+        tf->tf_eflags &= ~FL_IOPL_MASK;
+        u2k = (struct trapframe*)(tf->tf_esp - sizeof(struct trapframe) + 8);
+        memmove(u2k, tf, sizeof(struct trapframe) - 8);
+        *((uint32_t*)tf - 1) = (uint32_t)u2k;
+    }
+}
+
 static void
 trap_dispatch(struct trapframe *tf) {
     char c;
@@ -182,48 +229,27 @@ trap_dispatch(struct trapframe *tf) {
     case IRQ_OFFSET + IRQ_KBD:
         c = cons_getc();
         cprintf("kbd [%03d] %c\n", c, c);
+        if (c == '3')
+        {
+            print_trapframe(tf);
+            cprintf("Key_3 pressed and switch to user mode");
+            switchToUserMode(tf);
+        }
+        else if (c == '0')
+        {
+            print_trapframe(tf);
+            cprintf("Key_0 pressed and switch to kernel mode");
+            switchToKernelMode(tf);
+        }
         break;
     //LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
     case T_SWITCH_TOU:
         cprintf("### Switch to user mode");
-        if (tf->tf_cs != USER_CS)
-        {
-        /* It seems there are two ways to do the k2u switch
-         * The first is to use another trapframe as a temp relay. So we set the esp which was pushed into stack before calling trap to point to the temp trapframe, and then get from the trapframe the next esp which points to the origin stack position above tf
-         * In this implementation, we don't have to modify the esp before the int system call
-         */
-/*            k2u = *tf;
-            k2u.tf_cs = USER_CS;
-            k2u.tf_ds = k2u.tf_es = k2u.tf_ss = USER_DS;
-            k2u.tf_eflags |= FL_IOPL_MASK;
-            k2u.tf_esp = (uint32_t)tf + sizeof(struct trapframe) - 8;
-            *((uint32_t*)tf - 1) = &k2u;
-*/
-
-            /* The second is to update the trapframe in the stack directly and does not need additional trapframe
-             * Since no previlege changes occur in the interrupt, the current trapframe doesn't have the last 8 bytes. 
-             * We have to sub the esp by 8 before issuing the int system call
-             * Then we can modify the trapframe as needed and set the esp to the stack position above the trapframe, which will be retrieved due to the K2U switch
-             */
-            
-            tf->tf_cs = USER_CS;
-            tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
-            tf->tf_eflags |= FL_IOPL_MASK;
-            tf->tf_esp = (uint32_t)tf + sizeof(struct trapframe);
-        }
+        switchToUserMode(tf);
         break;
     case T_SWITCH_TOK:
         cprintf("### Switch to kernel mode");
-        if (tf->tf_cs != KERNEL_CS)
-        {
-            struct trapframe* u2k;
-            tf->tf_cs = KERNEL_CS;
-            tf->tf_ds = tf->tf_es = KERNEL_DS;
-            tf->tf_eflags &= ~FL_IOPL_MASK;
-            u2k = (struct trapframe*)(tf->tf_esp - sizeof(struct trapframe) + 8);
-            memmove(u2k, tf, sizeof(struct trapframe) - 8);
-            *((uint32_t*)tf - 1) = (uint32_t)u2k;
-        }
+        switchToKernelMode(tf);
         break;
     case IRQ_OFFSET + IRQ_IDE1:
     case IRQ_OFFSET + IRQ_IDE2:
