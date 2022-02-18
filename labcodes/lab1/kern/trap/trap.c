@@ -198,6 +198,16 @@ trap_dispatch(struct trapframe *tf) {
         break;
     case T_SWITCH_TOK:
         cprintf("### Switch to kernel mode");
+        if (tf->tf_cs != KERNEL_CS)
+        {
+            struct trapframe* u2k;
+            tf->tf_cs = KERNEL_CS;
+            tf->tf_ds = tf->tf_es = KERNEL_DS;
+            tf->tf_eflags &= ~FL_IOPL_MASK;
+            u2k = (struct trapframe*)(tf->tf_esp - sizeof(struct trapframe) + 8);
+            memmove(u2k, tf, sizeof(struct trapframe) - 8);
+            *((uint32_t*)tf - 1) = (uint32_t)u2k;
+        }
         break;
     case IRQ_OFFSET + IRQ_IDE1:
     case IRQ_OFFSET + IRQ_IDE2:
