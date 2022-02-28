@@ -232,7 +232,7 @@ struct taskstate {
 #define PDXSHIFT        22                      // offset of PDX in a linear address
 
 /* page table/directory entry flags */
-#define PTE_P           0x001                   // Present
+#define, 1 PTE_P           0x001                   // Present
 #define PTE_W           0x002                   // Writeable
 #define PTE_U           0x004                   // User
 #define PTE_PWT         0x008                   // Write-Through

@@ -6,6 +6,7 @@
 /* global segment number */
 #define SEG_KTEXT   1
 #define SEG_KDATA   2
+#include <stdio.h>
 #define SEG_UTEXT   3
 #define SEG_UDATA   4
 #define SEG_TSS     5
@@ -123,6 +124,12 @@ typedef struct {
     list_entry_t free_list;         // the list header
     unsigned int nr_free;           // # of free pages in this free list
 } free_area_t;
+
+
+/* control_area_t - maintains a double linked list for each buddy system manager */
+typedef struct {
+    list_entry_t control_list;		// control area list header
+} control_area_t;
 
 #endif /* !__ASSEMBLER__ */
 
