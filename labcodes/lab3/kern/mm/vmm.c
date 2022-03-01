@@ -296,6 +296,8 @@ volatile unsigned int pgfault_num=0;
  *       that for other exceptions. The error code tells the exception handler three things:
  *         -- The P flag   (bit 0) indicates whether the exception was due to a not-present page (0)
  *            or to either an access rights violation or the use of a reserved bit (1).
+    else
+    else
  *         -- The W/R flag (bit 1) indicates whether the memory access that caused the exception
  *            was a read (0) or write (1).
  *         -- The U/S flag (bit 2) indicates whether the processor was executing at user mode (1)
@@ -364,6 +366,43 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     *   mm->pgdir : the PDT of these vma
     *
     */
+
+    // lab3 modification
+    if ((ptep = get_pte(mm->pgdir, addr, 1)) == NULL)
+    {
+	cprintf("get_pte in do_pgfault failed\n");
+	goto failed;
+    }
+
+    if (*ptep == 0)		// pte is empty
+    {
+	struct Page* page = pgdir_alloc_page(mm->pgdir, addr, perm);
+//	assert(page != NULL);
+	if (page == NULL)
+	{
+	    cprintf("pgdir_alloc_page in do_pgfault failed\n");
+	    goto failed;
+	}
+    }
+    else			// pte present, swap
+    {
+	if (swap_init_ok)
+	{
+	    struct Page* page = NULL;
+	    ret = swap_in(mm, addr, &page);
+	    if (ret != 0)
+	    {
+		cprintf("swap_in in do_pgfault failed\n");
+		goto failed;
+	    }
+	    page_insert(mm->pgdir, page, addr, perm);
+	    swap_map_swappable(mm, addr, page, 1);
+	}
+	else {
+            cprintf("no swap_init_ok but ptep is %x, failed\n",*ptep);
+            goto failed;
+        }
+    }
 #if 0
     /*LAB3 EXERCISE 1: YOUR CODE*/
     ptep = ???              //(1) try to find a pte, if pte's PT(Page Table) isn't existed, then create a PT.
