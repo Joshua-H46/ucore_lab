@@ -56,6 +56,23 @@ idt_init(void) {
      /* LAB5 YOUR CODE */ 
      //you should update your lab1 code (just add ONE or TWO lines of code), let user app to use syscall to get the service of ucore
      //so you should setup the syscall interrupt gate in here
+    extern uintptr_t __vectors[];
+    int i = 0;
+    size_t num = sizeof(idt) / sizeof(struct gatedesc);
+    for (; i < num; i++)
+    {
+        int istrap = 0;
+        int dpl = DPL_KERNEL;
+
+        // I wonder if the T_SYSCALL should be checked like this
+        if (i == T_SYSCALL || i == T_SWITCH_TOK)
+        {
+            istrap = 1;
+            dpl = DPL_USER;
+        }
+        SETGATE(idt[i], istrap, GD_KTEXT, __vectors[i], dpl);
+    }
+    lidt(&idt_pd);
 }
 
 static const char *
@@ -181,7 +198,7 @@ pgfault_handler(struct trapframe *tf) {
 
 static volatile int in_swap_tick_event = 0;
 extern struct mm_struct *check_mm_struct;
-
+static volatile size_t tick = 0;
 static void
 trap_dispatch(struct trapframe *tf) {
     char c;
@@ -223,7 +240,12 @@ trap_dispatch(struct trapframe *tf) {
         /* you should upate you lab1 code (just add ONE or TWO lines of code):
          *    Every TICK_NUM cycle, you should set current process's current->need_resched = 1
          */
-  
+        tick++;
+        if (tick == TICK_NUM)
+        {
+            print_ticks();
+            tick = 0;
+        }
         break;
     case IRQ_OFFSET + IRQ_COM1:
         c = cons_getc();
