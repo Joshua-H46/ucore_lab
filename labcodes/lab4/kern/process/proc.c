@@ -102,6 +102,19 @@ alloc_proc(void) {
      *       uint32_t flags;                             // Process flag
      *       char name[PROC_NAME_LEN + 1];               // Process name
      */
+//	memset(proc, 0, sizeof(proc));
+	proc->state = PROC_UNINIT;
+	proc->pid = -1;
+	proc->runs = 0;
+	proc->kstack = 0;
+	proc->need_resched = 0;
+	proc->parent = NULL;
+	proc->mm = NULL;
+	memset(&(proc->context), 0, sizeof(struct context));
+	proc->tf = NULL;
+	proc->cr3 = boot_cr3;
+	proc->flags = 0;
+	memset(proc->name, 0, PROC_NAME_LEN + 1);
     }
     return proc;
 }
@@ -167,7 +180,7 @@ proc_run(struct proc_struct *proc) {
         {
             current = proc;
             load_esp0(next->kstack + KSTACKSIZE);
-            lcr3(next->cr3);
+            lcr3(next->cr3);		// switch page table
             switch_to(&(prev->context), &(next->context));
         }
         local_intr_restore(intr_flag);
@@ -296,6 +309,35 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     //    5. insert proc_struct into hash_list && proc_list
     //    6. call wakup_proc to make the new child process RUNNABLE
     //    7. set ret vaule using child proc's pid
+    proc = alloc_proc();
+    proc->parent = current;
+    ret = setup_kstack(proc);
+    if (ret != 0)
+    {
+	cprintf("setup_kstack failed\n");
+	goto bad_fork_cleanup_proc;
+    }
+    ret = copy_mm(clone_flags, proc);
+    if (ret != 0)
+    {
+	cprintf("copy_mm failed\n");
+	goto bad_fork_cleanup_kstack;
+    }
+    copy_thread(proc, stack, tf);
+    bool intr_flag;
+    local_intr_save(intr_flag);  	// need to disable interrupt
+    {
+	proc->pid = get_pid();
+	hash_proc(proc);
+	list_add_before(&proc_list, &(proc->list_link));
+	wakeup_proc(proc);
+	nr_process ++;
+    }
+    local_intr_restore(intr_flag);
+    ret = proc->pid;
+
+    cprintf("######### do fork success\n");
+
 fork_out:
     return ret;
 
