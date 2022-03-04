@@ -455,6 +455,17 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
                                   //(6) flush tlb
     }
 #endif
+    if (*ptep & PTE_P)          // pte present
+    {
+        struct Page* page = pte2page(*ptep);
+        page_ref_dec(page);
+        if (page_ref(page) == 0)
+        {
+            free_pages(page, 1);
+        }
+        *ptep = 0;
+        tlb_invalidate(pgdir, la);
+    }
 }
 
 void
