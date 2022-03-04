@@ -509,8 +509,12 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
             goto failed;
         }
     }
-    else                        // pte present, swap
+    else                        // pte not empty, swap
     {
+	if (*ptep & PTE_P)	// pte present, write to readonly page
+	{
+	    panic("error write to read only pte\n");
+	}
         if (swap_init_ok)
         {
             struct Page* page = NULL;
