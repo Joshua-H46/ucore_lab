@@ -7,6 +7,7 @@
 #include <default_sched.h>
 
 // the list of timer
+// Self commented: it seems the timers in the list are delta values, which means, how much time needed after the previous timer expires
 static list_entry_t timer_list;
 
 static struct sched_class *sched_class;

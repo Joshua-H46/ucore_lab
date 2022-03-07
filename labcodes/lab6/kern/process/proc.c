@@ -135,6 +135,13 @@ alloc_proc(void) {
         proc->cptr = NULL;
         proc->yptr = NULL;
         proc->optr = NULL;
+	proc->rq = NULL;
+	list_init(&(proc->run_link));
+//	proc->run_link.prev = proc->run_link.next = &(proc->run_link);
+	proc->time_slice = 0;
+	proc->lab6_run_pool.parent = proc->lab6_run_pool.left = proc->lab6_run_pool.right = NULL;
+	proc->lab6_stride = 0;
+	proc->lab6_priority = 0;
     }
     return proc;
 }
