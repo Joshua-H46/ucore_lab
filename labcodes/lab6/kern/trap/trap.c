@@ -199,7 +199,7 @@ pgfault_handler(struct trapframe *tf) {
 
 static volatile int in_swap_tick_event = 0;
 extern struct mm_struct *check_mm_struct;
-static volatile size_t tick = 0;
+//static volatile size_t tick = 0;
 static void
 trap_dispatch(struct trapframe *tf) {
     char c;
@@ -249,13 +249,13 @@ trap_dispatch(struct trapframe *tf) {
          *    Every tick, you should update the system time, iterate the timers, and trigger the timers which are end to call scheduler.
          *    You can use one funcitons to finish all these things.
          */
-        tick++;
-        if (tick == TICK_NUM)
-        {
-            print_ticks();
+        ticks++;
+//        if (tick == TICK_NUM)
+//        {
+//            print_ticks();
 //            current->need_resched = 1;
-            tick = 0;
-        }
+//            tick = 0;
+//        }
 	run_timer_list();
         break;
     case IRQ_OFFSET + IRQ_COM1:
