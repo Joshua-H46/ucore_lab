@@ -57,6 +57,23 @@ idt_init(void) {
      /* LAB5 YOUR CODE */ 
      //you should update your lab1 code (just add ONE or TWO lines of code), let user app to use syscall to get the service of ucore
      //so you should setup the syscall interrupt gate in here
+    extern uintptr_t __vectors[];
+    int i = 0;
+    size_t num = sizeof(idt) / sizeof(struct gatedesc);
+    for (; i < num; i++)
+    {
+        int istrap = 0;
+        int dpl = DPL_KERNEL;
+
+        // I wonder if the T_SYSCALL should be checked like this
+        if (i == T_SYSCALL || i == T_SWITCH_TOK)
+        {
+            istrap = 1;
+            dpl = DPL_USER;
+        }
+        SETGATE(idt[i], istrap, GD_KTEXT, __vectors[i], dpl);
+    }
+    lidt(&idt_pd);
 }
 
 static const char *
@@ -232,6 +249,8 @@ trap_dispatch(struct trapframe *tf) {
          *    Every tick, you should update the system time, iterate the timers, and trigger the timers which are end to call scheduler.
          *    You can use one funcitons to finish all these things.
          */
+	ticks++;
+	run_timer_list();
         break;
     case IRQ_OFFSET + IRQ_COM1:
         c = cons_getc();

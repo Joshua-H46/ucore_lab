@@ -493,6 +493,49 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
         }
    }
 #endif
+    if ((ptep = get_pte(mm->pgdir, addr, 1)) == NULL)
+    {
+        cprintf("get_pte in do_pgfault failed\n");
+        goto failed;
+    }
+
+    if (*ptep == 0)             // pte is empty
+    {
+        struct Page* page = pgdir_alloc_page(mm->pgdir, addr, perm);
+//      assert(page != NULL);
+        if (page == NULL)
+        {
+            cprintf("pgdir_alloc_page in do_pgfault failed\n");
+            goto failed;
+        }
+    }
+    else                        // pte present, swap
+    {
+        if (*ptep & PTE_P)      // write to read only page
+        {
+            panic("error write a readonly pte");
+        }
+        else
+        {
+            if (swap_init_ok)
+            {
+                struct Page* page = NULL;
+                ret = swap_in(mm, addr, &page);
+                if (ret != 0)
+                {
+                    cprintf("swap_in in do_pgfault failed\n");
+                    goto failed;
+                }
+                page_insert(mm->pgdir, page, addr, perm);
+                swap_map_swappable(mm, addr, page, 1);
+            }
+            else {
+                cprintf("no swap_init_ok but ptep is %x, failed\n",*ptep);
+                goto failed;
+            }
+        }
+    }
+
    ret = 0;
 failed:
     return ret;
