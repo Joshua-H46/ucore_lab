@@ -124,6 +124,14 @@ void phi_take_forks_condvar(int i) {
      // LAB7 EXERCISE1: YOUR CODE
      // I am hungry
      // try to get fork
+
+    // lab7 modification
+    state_condvar[i] = HUNGRY;
+    phi_test_condvar(i);
+    if (state_condvar[i] != EATING)
+    {
+	cond_wait(&(mtp->cv[i]));
+    }
 //--------leave routine in monitor--------------
       if(mtp->next_count>0)
          up(&(mtp->next));
@@ -138,6 +146,11 @@ void phi_put_forks_condvar(int i) {
      // LAB7 EXERCISE1: YOUR CODE
      // I ate over
      // test left and right neighbors
+
+    // lab7 modification
+    state_condvar[i] = THINKING;
+    phi_test_condvar(LEFT);
+    phi_test_condvar(RIGHT);
 //--------leave routine in monitor--------------
      if(mtp->next_count>0)
         up(&(mtp->next));
@@ -169,7 +182,7 @@ int philosopher_using_condvar(void * arg) { /* arg is the No. of philosopher 0~N
 void check_sync(void){
 
     int i;
-
+#if 1
     //check semaphore
     sem_init(&mutex, 1);
     for(i=0;i<N;i++){
@@ -181,7 +194,10 @@ void check_sync(void){
         philosopher_proc_sema[i] = find_proc(pid);
         set_proc_name(philosopher_proc_sema[i], "philosopher_sema_proc");
     }
+#endif
 
+#define MONITOR 1
+#if MONITOR
     //check condition variable
     monitor_init(&mt, N);
     for(i=0;i<N;i++){
@@ -193,4 +209,5 @@ void check_sync(void){
         philosopher_proc_condvar[i] = find_proc(pid);
         set_proc_name(philosopher_proc_condvar[i], "philosopher_condvar_proc");
     }
+#endif
 }
