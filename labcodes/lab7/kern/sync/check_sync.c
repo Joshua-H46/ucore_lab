@@ -128,6 +128,8 @@ void phi_take_forks_condvar(int i) {
     // lab7 modification
     state_condvar[i] = HUNGRY;
     phi_test_condvar(i);
+    // should here be while or if?
+    // I think if is ok because the waiting process will be woken up only after the state changed into EATING
     if (state_condvar[i] != EATING)
     {
 	cond_wait(&(mtp->cv[i]));

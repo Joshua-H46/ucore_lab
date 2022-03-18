@@ -33,6 +33,7 @@ cond_signal (condvar_t *cvp) {
     {
 	cvp->owner->next_count++;
 	up(&(cvp->sem)); 
+	// after the `up` above, there are 2 active processes in the monitor, so we should `down(next)` to let current process wait
 	down(&(cvp->owner->next));
 	cvp->owner->next_count--;
     }
@@ -60,6 +61,7 @@ cond_wait (condvar_t *cvp) {
     cvp->count++;
     if (cvp->owner->next_count > 0)
     {
+	// if a process waits here because of the `cond_signal` op, we should wakeup it first
 	up(&(cvp->owner->next));
     }
     else
