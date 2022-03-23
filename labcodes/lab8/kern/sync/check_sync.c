@@ -150,14 +150,9 @@ void phi_put_forks_condvar(int i) {
      // test left and right neighbors
 
     // lab7 modification
-    state_condvar[i] = HUNGRY;
-    phi_test_condvar(i);
-    // should here be while or if?
-    // I think if is ok because the waiting process will be woken up only after the state changed into EATING
-    if (state_condvar[i] != EATING)
-    {
-        cond_wait(&(mtp->cv[i]));
-    }
+    state_condvar[i] = THINKING;
+    phi_test_condvar(LEFT);
+    phi_test_condvar(RIGHT);
 //--------leave routine in monitor--------------
      if(mtp->next_count>0)
         up(&(mtp->next));
