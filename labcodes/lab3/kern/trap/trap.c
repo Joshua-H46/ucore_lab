@@ -178,7 +178,6 @@ pgfault_handler(struct trapframe *tf) {
 
 static volatile int in_swap_tick_event = 0;
 extern struct mm_struct *check_mm_struct;
-static volatile size_t tick = 0;
 static void
 trap_dispatch(struct trapframe *tf) {
     char c;
@@ -203,11 +202,11 @@ trap_dispatch(struct trapframe *tf) {
          * (2) Every TICK_NUM cycle, you can print some info using a funciton, such as print_ticks().
          * (3) Too Simple? Yes, I think so!
          */
-	tick++;
-        if (tick == TICK_NUM)
+	ticks++;
+        if (ticks == TICK_NUM)
         {
             print_ticks();
-            tick = 0;
+            ticks = 0;
         }
         break;
     case IRQ_OFFSET + IRQ_COM1:
