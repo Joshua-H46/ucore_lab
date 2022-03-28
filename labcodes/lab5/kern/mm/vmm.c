@@ -201,7 +201,7 @@ dup_mmap(struct mm_struct *to, struct mm_struct *from) {
 
         insert_vma_struct(to, nvma);
 
-        bool share = 0;
+        bool share = 1;
         if (copy_range(to->pgdir, from->pgdir, vma->vm_start, vma->vm_end, share) != 0) {
             return -E_NO_MEM;
         }
@@ -402,8 +402,13 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     }
     //check the error_code
     switch (error_code & 3) {
-    default:
+    case 3:
             /* error code flag : default is 3 ( W/R=1, P=1): write, present */
+	if (!(vma->vm_flags & VM_WRITE)) {
+            cprintf("do_pgfault failed: error code flag = write AND present, but the addr's vma cannot write\n");
+            goto failed;
+        }
+        break;
     case 2: /* error code flag : (W/R=1, P=0): write, not present */
         if (!(vma->vm_flags & VM_WRITE)) {
             cprintf("do_pgfault failed: error code flag = write AND not present, but the addr's vma cannot write\n");
@@ -418,6 +423,9 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
             cprintf("do_pgfault failed: error code flag = read AND not present, but the addr's vma cannot read or exec\n");
             goto failed;
         }
+        break;
+    default:		// should not be here
+	assert(0);
     }
     /* IF (write an existed addr ) OR
      *    (write an non_existed addr && addr is writable) OR
@@ -425,6 +433,7 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
      * THEN
      *    continue process
      */
+
     uint32_t perm = PTE_U;
     if (vma->vm_flags & VM_WRITE) {
         perm |= PTE_W;
@@ -433,7 +442,6 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
 
     ret = -E_NO_MEM;
 
-    pte_t *ptep=NULL;
     /*LAB3 EXERCISE 1: YOUR CODE
     * Maybe you want help comment, BELOW comments can help you finish the code
     *
@@ -493,6 +501,7 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
         }
    }
 #endif
+    pte_t *ptep = NULL;
     if ((ptep = get_pte(mm->pgdir, addr, 1)) == NULL)
     {
         cprintf("get_pte in do_pgfault failed\n");
@@ -511,26 +520,45 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     }
     else                        // pte not empty, swap
     {
+	struct Page *page = NULL;
 	if (*ptep & PTE_P)	// pte present, write to readonly page
 	{
-	    panic("error write to read only pte\n");
+	// do copy on write
+	    page = pte2page(*ptep);
+	    assert(page!=NULL);
+	    int ref = page_ref(page);
+	    if (ref > 1) {
+	        struct Page *npage;
+	        npage = pgdir_alloc_page(mm->pgdir, addr, perm);
+	        // copy content to new page
+	        void *kva_src = page2kva(page);
+	        void *kva_dst = page2kva(npage);
+	        memcpy(kva_dst, kva_src, PGSIZE);
+	    }
+	    else {
+	        *ptep |= PTE_W;
+	        tlb_invalidate(ptep, addr);
+	    }
 	}
-        if (swap_init_ok)
-        {
-            struct Page* page = NULL;
-            ret = swap_in(mm, addr, &page);
-            if (ret != 0)
+	else {
+            if (swap_init_ok)
             {
-                cprintf("swap_in in do_pgfault failed\n");
-                goto failed;
+        	page = NULL;
+            	ret = swap_in(mm, addr, &page);
+            	if (ret != 0)
+            	{
+                    cprintf("swap_in in do_pgfault failed\n");
+                    goto failed;
+            	}
+            	page_insert(mm->pgdir, page, addr, perm);
             }
-            page_insert(mm->pgdir, page, addr, perm);
-            swap_map_swappable(mm, addr, page, 1);
+            else {
+            	cprintf("no swap_init_ok but ptep is %x, failed\n",*ptep);
+            	goto failed;
+	    }
         }
-        else {
-            cprintf("no swap_init_ok but ptep is %x, failed\n",*ptep);
-            goto failed;
-        }
+	swap_map_swappable(mm, addr, page, 1);
+	page->pra_vaddr = addr;
     }
 
    ret = 0;
