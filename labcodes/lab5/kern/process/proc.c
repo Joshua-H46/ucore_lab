@@ -446,8 +446,6 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     wakeup_proc(proc);
     ret = proc->pid;
 
-    cprintf("######### do fork success\n");
-	
 fork_out:
     return ret;
 
@@ -827,7 +825,7 @@ user_main(void *arg) {
 #ifdef TEST
     KERNEL_EXECVE2(TEST, TESTSTART, TESTSIZE);
 #else
-    KERNEL_EXECVE(waitkill);
+    KERNEL_EXECVE(exit);
 #endif
     panic("user_main execve failed.\n");
 }
